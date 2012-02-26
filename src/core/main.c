@@ -260,6 +260,7 @@ static int parse_proc_cmdline_word(const char *word) {
                 "emergency", SPECIAL_EMERGENCY_TARGET,
                 "-b",        SPECIAL_EMERGENCY_TARGET,
                 "rescue",    SPECIAL_RESCUE_TARGET,
+                "failsafe",  SPECIAL_RESCUE_TARGET,
                 "single",    SPECIAL_RESCUE_TARGET,
                 "-s",        SPECIAL_RESCUE_TARGET,
                 "s",         SPECIAL_RESCUE_TARGET,
