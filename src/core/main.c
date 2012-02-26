@@ -270,6 +270,7 @@ static int parse_proc_cmdline_item(const char *key, const char *value) {
                 "emergency", SPECIAL_EMERGENCY_TARGET,
                 "-b",        SPECIAL_EMERGENCY_TARGET,
                 "rescue",    SPECIAL_RESCUE_TARGET,
+                "failsafe",  SPECIAL_RESCUE_TARGET,
                 "single",    SPECIAL_RESCUE_TARGET,
                 "-s",        SPECIAL_RESCUE_TARGET,
                 "s",         SPECIAL_RESCUE_TARGET,
