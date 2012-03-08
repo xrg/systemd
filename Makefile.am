@@ -550,6 +550,11 @@ units-uninstall-hook:
 INSTALL_DATA_HOOKS += units-install-hook
 UNINSTALL_DATA_HOOKS += units-uninstall-hook
 
+# Just for Mageia for now until we switch to new methods of starting the appropriate DM
+dist_systemunit_DATA += \
+	units/mageia/prefdm.service \
+	units/mageia/display-manager-failure.service
+
 dist_doc_DATA = \
 	README \
 	NEWS \
