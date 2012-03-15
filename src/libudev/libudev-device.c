@@ -78,6 +78,7 @@ struct udev_device {
         struct udev_list tags_list;
         unsigned long long int seqnum;
         usec_t usec_initialized;
+        int timeout;
         int devlink_priority;
         int refcount;
         dev_t devnum;
@@ -169,6 +170,21 @@ static int udev_device_set_devnum(struct udev_device *udev_device, dev_t devnum)
         udev_device_add_property(udev_device, "MAJOR", num);
         snprintf(num, sizeof(num), "%u", minor(devnum));
         udev_device_add_property(udev_device, "MINOR", num);
+        return 0;
+}
+
+int udev_device_get_timeout(struct udev_device *udev_device)
+{
+        return udev_device->timeout;
+}
+
+static int udev_device_set_timeout(struct udev_device *udev_device, int timeout)
+{
+        char num[32];
+
+        udev_device->timeout = timeout;
+        snprintf(num, sizeof(num), "%u", timeout);
+        udev_device_add_property(udev_device, "TIMEOUT", num);
         return 0;
 }
 
@@ -462,6 +478,8 @@ void udev_device_add_property_from_string_parse(struct udev_device *udev_device,
                 udev_device_set_devpath_old(udev_device, &property[12]);
         } else if (startswith(property, "SEQNUM=")) {
                 udev_device_set_seqnum(udev_device, strtoull(&property[7], NULL, 10));
+        } else if (startswith(property, "TIMEOUT=")) {
+                udev_device_set_timeout(udev_device, strtoull(&property[8], NULL, 10));
         } else if (startswith(property, "IFINDEX=")) {
                 udev_device_set_ifindex(udev_device, strtoull(&property[8], NULL, 10));
         } else if (startswith(property, "DEVMODE=")) {
@@ -655,6 +673,7 @@ struct udev_device *udev_device_new(struct udev *udev)
         udev_list_init(udev, &udev_device->sysattr_value_list, true);
         udev_list_init(udev, &udev_device->sysattr_list, false);
         udev_list_init(udev, &udev_device->tags_list, true);
+        udev_device->timeout = -1;
         udev_device->watch_handle = -1;
         /* copy global properties */
         udev_list_entry_foreach(list_entry, udev_get_properties_list_entry(udev))
