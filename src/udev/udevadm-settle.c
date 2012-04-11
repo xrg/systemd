@@ -33,6 +33,7 @@
 #include <sys/types.h>
 
 #include "udev.h"
+#include "fileio.h"
 #include "udev-util.h"
 #include "util.h"
 
@@ -55,6 +56,7 @@ static int adm_settle(struct udev *udev, int argc, char *argv[]) {
         };
         const char *exists = NULL;
         unsigned int timeout = 120;
+        char *line;
         struct pollfd pfd[1] = { {.fd = -1}, };
         int c;
         struct udev_queue *queue;
@@ -89,6 +91,37 @@ static int adm_settle(struct udev *udev, int argc, char *argv[]) {
         if (optind < argc) {
                 fprintf(stderr, "Extraneous argument: '%s'\n", argv[optind]);
                 return EXIT_FAILURE;
+        }
+
+        /*
+         * read the kernel commandline, in case we need to tweak timeout
+         *   udev.settle-timeout=<timeout>  settle timeout
+         *
+         */
+        if (read_one_line_file("/proc/cmdline", &line) >= 0) {
+                char *w, *state;
+                size_t l;
+
+                FOREACH_WORD_QUOTED(w, l, line, state) {
+                        char *s, *opt;
+
+                        s = strndup(w, l);
+                        if (!s)
+                                break;
+
+                        /* accept the same options for the initrd, prefixed with "rd." */
+                        if (in_initrd() && startswith(s, "rd."))
+                                opt = s + 3;
+                        else
+                                opt = s;
+
+                        if (startswith(opt, "udev.settle-timeout=") && safe_atou(opt + 20, &timeout) >= 0)
+                                log_debug("timeout=%i (via kernel cmdline)\n", timeout);
+
+                        free(s);
+                }
+
+                free(line);
         }
 
         /* guarantee that the udev daemon isn't pre-processing */
