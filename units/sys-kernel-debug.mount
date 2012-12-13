@@ -18,3 +18,4 @@ Before=sysinit.target
 What=debugfs
 Where=/sys/kernel/debug
 Type=debugfs
+Options=mode=0755
