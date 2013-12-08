@@ -424,6 +424,12 @@ _public_ PAM_EXTERN int pam_sm_open_session(
                          pam_syslog(handle, LOG_ERR, "Failed to set runtime dir.");
                          goto finish;
                 }
+        } else {
+                (void) unsetenv("XDG_RUNTIME_DIR");
+                r = pam_putenv(handle, "XDG_RUNTIME_DIR");
+                if (r != PAM_SUCCESS && r != PAM_BAD_ITEM) {
+                         pam_syslog(handle, LOG_ERR, "Failed to unset runtime dir.");
+                }
         }
 
         if (!isempty(seat)) {
