@@ -467,6 +467,8 @@ _public_ PAM_EXTERN int pam_sm_open_session(
                 }
         } else {
                 (void) unsetenv("XDG_RUNTIME_DIR");
+                /* Avoid errors from pam_putenv when the var does not exist */
+                pam_putenv(handle, "XDG_RUNTIME_DIR=");
                 r = pam_putenv(handle, "XDG_RUNTIME_DIR");
                 if (r != PAM_SUCCESS && r != PAM_BAD_ITEM) {
                          pam_syslog(handle, LOG_ERR, "Failed to unset runtime dir.");
