@@ -190,6 +190,7 @@ int manager_stop_unit(Manager *manager, const char *unit, DBusError *error, char
 int manager_abandon_scope(Manager *manager, const char *scope, DBusError *error);
 int manager_kill_unit(Manager *manager, const char *unit, KillWho who, int signo, DBusError *error);
 int manager_unit_is_active(Manager *manager, const char *unit);
+int manager_job_is_active(Manager *manager, const char *path);
 
 /* gperf lookup function */
 const struct ConfigPerfItem* logind_gperf_lookup(const char *key, unsigned length);

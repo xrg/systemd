@@ -2913,3 +2913,54 @@ int manager_unit_is_active(Manager *manager, const char *unit) {
 
         return !streq(state, "inactive") && !streq(state, "failed");
 }
+
+int manager_job_is_active(Manager *manager, const char *path) {
+
+        const char *interface = "org.freedesktop.systemd1.Job";
+        const char *property = "State";
+        _cleanup_dbus_message_unref_ DBusMessage *reply = NULL;
+        DBusError error;
+        int r;
+
+        assert(manager);
+        assert(path);
+
+        dbus_error_init(&error);
+
+        r = bus_method_call_with_reply(
+                        manager->bus,
+                        "org.freedesktop.systemd1",
+                        path,
+                        "org.freedesktop.DBus.Properties",
+                        "Get",
+                        &reply,
+                        &error,
+                        DBUS_TYPE_STRING, &interface,
+                        DBUS_TYPE_STRING, &property,
+                        DBUS_TYPE_INVALID);
+        if (r < 0) {
+                if (dbus_error_has_name(&error, DBUS_ERROR_NO_REPLY) ||
+                    dbus_error_has_name(&error, DBUS_ERROR_DISCONNECTED)) {
+                        /* systemd might have droppped off
+                         * momentarily, let's not make this an
+                         * error */
+
+                        dbus_error_free(&error);
+                        return true;
+                }
+
+                if (dbus_error_has_name(&error, DBUS_ERROR_UNKNOWN_OBJECT)) {
+                        dbus_error_free(&error);
+                        return false;
+                }
+
+                log_error("Failed to query State: %s", bus_error(&error, r));
+                dbus_error_free(&error);
+                return r;
+        }
+
+        /* We don't actually care about the state really. The fact
+         * that we could read the job state is enough for us */
+
+        return true;
+}

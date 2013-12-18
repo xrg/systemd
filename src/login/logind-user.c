@@ -628,7 +628,10 @@ int user_check_gc(User *u, bool drop_not_started) {
         if (user_check_linger_file(u) > 0)
                 return 1;
 
-        if (u->slice_job || u->service_job)
+        if (u->slice_job && manager_job_is_active(u->manager, u->slice_job))
+                return 1;
+
+        if (u->service_job && manager_job_is_active(u->manager, u->service_job))
                 return 1;
 
         if (u->slice && manager_unit_is_active(u->manager, u->slice) != 0)
