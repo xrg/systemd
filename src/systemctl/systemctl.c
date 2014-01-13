@@ -4448,6 +4448,11 @@ static int enable_unit(DBusConnection *bus, char **args) {
                 return r;
 
         if (!bus || avoid_bus()) {
+                /* If the sysvinit compat calls have handled everything we may
+                 * have none left to deal with natively... */
+                if (!mangled_names[0])
+                        goto finish;
+
                 if (streq(verb, "enable")) {
                         r = unit_file_enable(arg_scope, arg_runtime, arg_root, mangled_names, arg_force, &changes, &n_changes);
                         carries_install_info = r;
@@ -4490,6 +4495,11 @@ static int enable_unit(DBusConnection *bus, char **args) {
                 bool send_force = true, expect_carries_install_info = false;
                 dbus_bool_t a, b;
                 DBusMessageIter iter, sub, sub2;
+
+                /* If the sysvinit compat calls have handled everything we may
+                 * have none left to deal with natively... */
+                if (!mangled_names[0])
+                        goto reload;
 
                 if (streq(verb, "enable")) {
                         method = "EnableUnitFiles";
@@ -4609,6 +4619,7 @@ static int enable_unit(DBusConnection *bus, char **args) {
                         dbus_message_iter_next(&sub);
                 }
 
+reload:
                 /* Try to reload if enabeld */
                 if (!arg_no_reload)
                         r = daemon_reload(bus, args);
