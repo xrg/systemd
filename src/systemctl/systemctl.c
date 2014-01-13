@@ -5248,6 +5248,11 @@ static int enable_unit(sd_bus *bus, char **args) {
                 return r;
 
         if (!bus || avoid_bus()) {
+                /* If the sysvinit compat calls have handled everything we may
+                 * have none left to deal with natively... */
+                if (!names[0])
+                        goto finish;
+
                 if (streq(verb, "enable")) {
                         r = unit_file_enable(arg_scope, arg_runtime, arg_root, names, arg_force, &changes, &n_changes);
                         carries_install_info = r;
@@ -5283,6 +5288,11 @@ static int enable_unit(sd_bus *bus, char **args) {
                 int expect_carries_install_info = false;
                 bool send_force = true, send_preset_mode = false;
                 const char *method;
+
+                /* If the sysvinit compat calls have handled everything we may
+                 * have none left to deal with natively... */
+                if (!names[0])
+                        goto reload;
 
                 if (streq(verb, "enable")) {
                         method = "EnableUnitFiles";
@@ -5362,6 +5372,7 @@ static int enable_unit(sd_bus *bus, char **args) {
                 if (r < 0)
                         return r;
 
+reload:
                 /* Try to reload if enabled */
                 if (!arg_no_reload)
                         r = daemon_reload(bus, args);
