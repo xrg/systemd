@@ -4259,8 +4259,8 @@ static int enable_sysv_units(const char *verb, char **args) {
                 const char *name;
                 _cleanup_free_ char *p = NULL, *q = NULL;
                 bool found_native = false, found_sysv;
-                unsigned c = 1;
-                const char *argv[6] = { "/sbin/chkconfig", NULL, NULL, NULL, NULL };
+                unsigned c = 3;
+                const char *argv[8] = { "/sbin/chkconfig", "--no-reload", "--no-redirect", NULL, NULL, NULL, NULL };
                 char **k, *l;
                 int j;
                 pid_t pid;
