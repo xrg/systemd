@@ -1201,6 +1201,7 @@ static int socket_spawn(Socket *s, ExecCommand *c, pid_t *_pid) {
         if (r < 0)
                 goto fail;
 
+        exec_params.cgroup_delegate = s->cgroup_context.delegate;
         r = exec_spawn(c,
                        argv,
                        &s->exec_context,

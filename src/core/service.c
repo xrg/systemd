@@ -1815,6 +1815,7 @@ static int service_spawn(
         } else
                 path = UNIT(s)->cgroup_path;
 
+        exec_params.cgroup_delegate = s->cgroup_context.delegate;
         r = exec_spawn(c,
                        argv,
                        &s->exec_context,

@@ -162,6 +162,7 @@ struct ExecContext {
 
 #include "cgroup.h"
 
+        bool cgroup_delegate;
 int exec_spawn(ExecCommand *command,
                char **argv,
                ExecContext *context,
@@ -200,6 +201,7 @@ int exec_context_load_environment(const ExecContext *c, char ***l);
 
 bool exec_context_may_touch_console(ExecContext *c);
 void exec_context_serialize(const ExecContext *c, Unit *u, FILE *f);
+bool exec_context_maintains_privileges(ExecContext *c);
 
 void exec_status_start(ExecStatus *s, pid_t pid);
 void exec_status_exit(ExecStatus *s, ExecContext *context, pid_t pid, int code, int status);
