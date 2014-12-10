@@ -393,10 +393,15 @@ static CGroupControllerMask unit_get_siblings_mask(Unit *u) {
 
 static int unit_create_cgroups(Unit *u, CGroupControllerMask mask) {
         char *path = NULL;
+        CGroupContext *c;
         int r;
         bool is_in_hash = false;
 
         assert(u);
+
+        c = unit_get_cgroup_context(u);
+        if (!c)
+                return 0;
 
         path = unit_default_cgroup_path(u);
         if (!path)
@@ -417,8 +422,10 @@ static int unit_create_cgroups(Unit *u, CGroupControllerMask mask) {
         if (r < 0)
                 log_error("Failed to create cgroup %s: %s", path, strerror(-r));
 
-        /* Then, possibly move things over */
-        if (u->cgroup_path) {
+        /* Then, possibly move things over, but not if
+         * subgroups may contain processes, which is the case
+         * for slice and delegation units. */
+        if (u->cgroup_path && u->type != UNIT_SLICE && !c->delegate) {
                 r = cg_migrate_everywhere(u->manager->cgroup_supported, u->cgroup_path, path);
                 if (r < 0)
                         log_error("Failed to migrate cgroup %s: %s", path, strerror(-r));
