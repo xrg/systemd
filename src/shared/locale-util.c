@@ -155,6 +155,33 @@ static int add_locales_from_libdir (Set *locales) {
         return 0;
 }
 
+static int add_locales_from_sharedir (Set *locales) {
+        _cleanup_closedir_ DIR *dir = NULL;
+        struct dirent *entry;
+        int r;
+
+        dir = opendir("/usr/share/locale");
+        if (!dir)
+                return errno == ENOENT ? 0 : -errno;
+
+        FOREACH_DIRENT(entry, dir, return -errno) {
+                char *z;
+
+                if (entry->d_type != DT_DIR)
+                        continue;
+
+                z = strdup(entry->d_name);
+                if (!z)
+                        return -ENOMEM;
+
+                r = set_consume(locales, z);
+                if (r < 0 && r != -EEXIST)
+                        return r;
+        }
+
+        return 0;
+}
+
 int get_locales(char ***ret) {
         _cleanup_set_free_ Set *locales = NULL;
         _cleanup_strv_free_ char **l = NULL;
@@ -169,6 +196,10 @@ int get_locales(char ***ret) {
                 return r;
 
         r = add_locales_from_libdir(locales);
+        if (r < 0)
+                return r;
+
+        r = add_locales_from_sharedir(locales);
         if (r < 0)
                 return r;
 
