@@ -162,7 +162,7 @@ static int bus_cgroup_set_transient_property(
 
                         dbus_message_iter_get_basic(i, &b);
                         c->delegate = b;
-                        unit_write_drop_in_private(u, mode, name, b ? "Delegate=yes" : "Delegate=no");
+                        unit_write_drop_in_private(u, mode, name, b ? "Delegate=yes\n" : "Delegate=no\n");
                 }
 
                 return 1;
@@ -194,7 +194,7 @@ int bus_cgroup_set_property(
                         dbus_message_iter_get_basic(i, &b);
 
                         c->cpu_accounting = b;
-                        unit_write_drop_in_private(u, mode, name, b ? "CPUAccounting=yes" : "CPUAccounting=no");
+                        unit_write_drop_in_private(u, mode, name, b ? "CPUAccounting=yes\n" : "CPUAccounting=no\n");
                 }
 
                 return 1;
@@ -214,7 +214,7 @@ int bus_cgroup_set_property(
 
                 if (mode != UNIT_CHECK) {
                         c->cpu_shares = ul;
-                        unit_write_drop_in_private_format(u, mode, name, "CPUShares=%lu", ul);
+                        unit_write_drop_in_private_format(u, mode, name, "CPUShares=%lu\n", ul);
                 }
 
                 return 1;
@@ -229,7 +229,7 @@ int bus_cgroup_set_property(
                         dbus_message_iter_get_basic(i, &b);
 
                         c->blockio_accounting = b;
-                        unit_write_drop_in_private(u, mode, name, b ? "BlockIOAccounting=yes" : "BlockIOAccounting=no");
+                        unit_write_drop_in_private(u, mode, name, b ? "BlockIOAccounting=yes\n" : "BlockIOAccounting=no\n");
                 }
 
                 return 1;
@@ -249,7 +249,7 @@ int bus_cgroup_set_property(
 
                 if (mode != UNIT_CHECK) {
                         c->blockio_weight = ul;
-                        unit_write_drop_in_private_format(u, mode, name, "BlockIOWeight=%lu", ul);
+                        unit_write_drop_in_private_format(u, mode, name, "BlockIOWeight=%lu\n", ul);
                 }
 
                 return 1;
@@ -445,7 +445,7 @@ int bus_cgroup_set_property(
                         dbus_message_iter_get_basic(i, &b);
 
                         c->memory_accounting = b;
-                        unit_write_drop_in_private(u, mode, name, b ? "MemoryAccounting=yes" : "MemoryAccounting=no");
+                        unit_write_drop_in_private(u, mode, name, b ? "MemoryAccounting=yes\n" : "MemoryAccounting=no\n");
                 }
 
                 return 1;
@@ -460,7 +460,7 @@ int bus_cgroup_set_property(
                         dbus_message_iter_get_basic(i, &limit);
 
                         c->memory_limit = limit;
-                        unit_write_drop_in_private_format(u, mode, name, "%s=%" PRIu64, name, limit);
+                        unit_write_drop_in_private_format(u, mode, name, "%s=%" PRIu64 "\n", name, limit);
                 }
 
                 return 1;
@@ -478,12 +478,9 @@ int bus_cgroup_set_property(
                         return -EINVAL;
 
                 if (mode != UNIT_CHECK) {
-                        char *buf;
-
                         c->device_policy = p;
 
-                        buf = strappenda("DevicePolicy=", policy);
-                        unit_write_drop_in_private(u, mode, name, buf);
+                        unit_write_drop_in_private_format(u, mode, name, "DevicePolicy=%s\n", policy);
                 }
 
                 return 1;
