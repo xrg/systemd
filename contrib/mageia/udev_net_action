@@ -1,0 +1,16 @@
+#!/bin/sh
+
+[ -z "$INTERFACE" ] && exit 0
+[ ! -f /var/lock/subsys/network ] && exit 0
+
+[ "${INTERFACE#ppp}" = "$INTERFACE" ] && /usr/sbin/mdv-network-event $ACTION $INTERFACE
+
+[ -r /etc/sysconfig/udev_net ] && . /etc/sysconfig/udev_net
+[ -n "$BLACKLIST_ALL" ] && eval "case $INTERFACE in $BLACKLIST_ALL) exit 1;; esac"
+
+CFG=/etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+[ ! -r $CFG ] && exit 0
+
+export IN_HOTPLUG=1
+[ "$ACTION" = add ] && exec /sbin/ifup $INTERFACE daemon
+[ "$ACTION" = remove ] && exec /sbin/ifdown $INTERFACE daemon
