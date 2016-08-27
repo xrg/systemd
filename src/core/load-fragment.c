@@ -515,9 +515,7 @@ int config_parse_exec(const char *unit,
                                 }
 
                                 if (!utf8_is_valid(path)) {
-                                        log_syntax(unit, LOG_ERR, filename, line, EINVAL,
-                                                   "Path is not UTF-8 clean, ignoring assignment: %s",
-                                                   rvalue);
+                                        log_invalid_utf8(unit, LOG_ERR, filename, line, EINVAL, rvalue);
                                         r = 0;
                                         goto fail;
                                 }
@@ -532,9 +530,7 @@ int config_parse_exec(const char *unit,
                                 }
 
                                 if (!utf8_is_valid(c)) {
-                                        log_syntax(unit, LOG_ERR, filename, line, EINVAL,
-                                                   "Path is not UTF-8 clean, ignoring assignment: %s",
-                                                   rvalue);
+                                        log_invalid_utf8(unit, LOG_ERR, filename, line, EINVAL, rvalue);
                                         r = 0;
                                         goto fail;
                                 }
@@ -1195,8 +1191,11 @@ int config_parse_timer(const char *unit,
         }
 
         v = new0(TimerValue, 1);
-        if (!v)
+        if (!v) {
+                if (c)
+                        calendar_spec_free(c);
                 return log_oom();
+        }
 
         v->base = b;
         v->clock_id = id;
@@ -1803,8 +1802,7 @@ int config_parse_unit_requires_mounts_for(
                         return log_oom();
 
                 if (!utf8_is_valid(n)) {
-                        log_syntax(unit, LOG_ERR, filename, line, EINVAL,
-                                   "Path is not UTF-8 clean, ignoring assignment: %s", rvalue);
+                        log_invalid_utf8(unit, LOG_ERR, filename, line, EINVAL, rvalue);
                         continue;
                 }
 
@@ -1860,7 +1858,8 @@ int config_parse_documentation(const char *unit,
                         free(*a);
                 }
         }
-        *b = NULL;
+        if (b)
+                *b = NULL;
 
         return r;
 }
@@ -2377,7 +2376,7 @@ static int open_follow(char **filename, FILE **_f, Set *names, char **_final) {
         f = fdopen(fd, "re");
         if (!f) {
                 r = -errno;
-                close_nointr_nofail(fd);
+                safe_close(fd);
                 return r;
         }
 
@@ -2432,9 +2431,10 @@ static int merge_by_names(Unit **u, Set *names, const char *id) {
 
 static int load_from_path(Unit *u, const char *path) {
         int r;
-        Set *symlink_names;
-        FILE *f = NULL;
-        char *filename = NULL, *id = NULL;
+        _cleanup_set_free_free_ Set *symlink_names = NULL;
+        _cleanup_fclose_ FILE *f = NULL;
+        _cleanup_free_ char *filename = NULL;
+        char *id = NULL;
         Unit *merged;
         struct stat st;
 
@@ -2448,10 +2448,8 @@ static int load_from_path(Unit *u, const char *path) {
         if (path_is_absolute(path)) {
 
                 filename = strdup(path);
-                if (!filename) {
-                        r = -ENOMEM;
-                        goto finish;
-                }
+                if (!filename)
+                        return -ENOMEM;
 
                 r = open_follow(&filename, &f, symlink_names, &id);
                 if (r < 0) {
@@ -2459,7 +2457,7 @@ static int load_from_path(Unit *u, const char *path) {
                         filename = NULL;
 
                         if (r != -ENOENT)
-                                goto finish;
+                                return r;
                 }
 
         } else  {
@@ -2471,10 +2469,8 @@ static int load_from_path(Unit *u, const char *path) {
                          * follow all symlinks and add their name to our unit
                          * name set while doing so */
                         filename = path_make_absolute(path, *p);
-                        if (!filename) {
-                                r = -ENOMEM;
-                                goto finish;
-                        }
+                        if (!filename)
+                                return -ENOMEM;
 
                         if (u->manager->unit_path_cache &&
                             !set_get(u->manager->unit_path_cache, filename))
@@ -2487,7 +2483,7 @@ static int load_from_path(Unit *u, const char *path) {
                                 filename = NULL;
 
                                 if (r != -ENOENT)
-                                        goto finish;
+                                        return r;
 
                                 /* Empty the symlink names for the next run */
                                 set_clear_free(symlink_names);
@@ -2498,27 +2494,22 @@ static int load_from_path(Unit *u, const char *path) {
                 }
         }
 
-        if (!filename) {
+        if (!filename)
                 /* Hmm, no suitable file found? */
-                r = 0;
-                goto finish;
-        }
+                return 0;
 
         merged = u;
         r = merge_by_names(&merged, symlink_names, id);
         if (r < 0)
-                goto finish;
+                return r;
 
         if (merged != u) {
                 u->load_state = UNIT_MERGED;
-                r = 0;
-                goto finish;
+                return 0;
         }
 
-        if (fstat(fileno(f), &st) < 0) {
-                r = -errno;
-                goto finish;
-        }
+        if (fstat(fileno(f), &st) < 0)
+                return -errno;
 
         if (null_or_empty(&st))
                 u->load_state = UNIT_MASKED;
@@ -2530,7 +2521,7 @@ static int load_from_path(Unit *u, const char *path) {
                                  config_item_perf_lookup,
                                  (void*) load_fragment_gperf_lookup, false, true, u);
                 if (r < 0)
-                        goto finish;
+                        return r;
         }
 
         free(u->fragment_path);
@@ -2546,16 +2537,7 @@ static int load_from_path(Unit *u, const char *path) {
                         u->source_mtime = 0;
         }
 
-        r = 0;
-
-finish:
-        set_free_free(symlink_names);
-        free(filename);
-
-        if (f)
-                fclose(f);
-
-        return r;
+        return 0;
 }
 
 int unit_load_fragment(Unit *u) {

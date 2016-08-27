@@ -374,7 +374,7 @@ static int transaction_verify_order_one(Transaction *tr, Job *j, Job *from, unsi
                                       "Found dependency on %s/%s",
                                       k->unit->id, job_type_to_string(k->type));
 
-                        if (!delete &&
+                        if (!delete && hashmap_get(tr->jobs, k->unit) &&
                             !unit_matters_to_anchor(k->unit, k)) {
                                 /* Ok, we can drop this one, so let's
                                  * do so. */
@@ -861,12 +861,18 @@ int transaction_add_job_and_dependencies(
         }
 
         if (type != JOB_STOP && unit->load_state == UNIT_ERROR) {
-                dbus_set_error(e, BUS_ERROR_LOAD_FAILED,
-                               "Unit %s failed to load: %s. "
-                               "See system logs and 'systemctl status %s' for details.",
-                               unit->id,
-                               strerror(-unit->load_error),
-                               unit->id);
+                if (unit->load_error == -ENOENT)
+                        dbus_set_error(e, BUS_ERROR_LOAD_FAILED,
+                                       "Unit %s failed to load: %s.",
+                                       unit->id,
+                                       strerror(-unit->load_error));
+                else
+                        dbus_set_error(e, BUS_ERROR_LOAD_FAILED,
+                                       "Unit %s failed to load: %s. "
+                                       "See system logs and 'systemctl status %s' for details.",
+                                       unit->id,
+                                       strerror(-unit->load_error),
+                                       unit->id);
                 return -EINVAL;
         }
 

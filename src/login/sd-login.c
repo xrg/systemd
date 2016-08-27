@@ -350,11 +350,11 @@ _public_ int sd_session_get_tty(const char *session, char **tty) {
 }
 
 _public_ int sd_session_get_vt(const char *session, unsigned *vtnr) {
-        _cleanup_free_ char *vtnr_string;
+        _cleanup_free_ char *vtnr_string = NULL;
         unsigned u;
         int r;
 
-        r = session_get_string(session, "VTNr", &vtnr_string);
+        r = session_get_string(session, "VTNR", &vtnr_string);
         if (r < 0)
                 return r;
 
@@ -646,7 +646,7 @@ _public_ int sd_login_monitor_new(const char *category, sd_login_monitor **m) {
         if (!category || streq(category, "seat")) {
                 k = inotify_add_watch(fd, "/run/systemd/seats/", IN_MOVED_TO|IN_DELETE);
                 if (k < 0) {
-                        close_nointr_nofail(fd);
+                        safe_close(fd);
                         return -errno;
                 }
 
@@ -656,7 +656,7 @@ _public_ int sd_login_monitor_new(const char *category, sd_login_monitor **m) {
         if (!category || streq(category, "session")) {
                 k = inotify_add_watch(fd, "/run/systemd/sessions/", IN_MOVED_TO|IN_DELETE);
                 if (k < 0) {
-                        close_nointr_nofail(fd);
+                        safe_close(fd);
                         return -errno;
                 }
 
@@ -666,7 +666,7 @@ _public_ int sd_login_monitor_new(const char *category, sd_login_monitor **m) {
         if (!category || streq(category, "uid")) {
                 k = inotify_add_watch(fd, "/run/systemd/users/", IN_MOVED_TO|IN_DELETE);
                 if (k < 0) {
-                        close_nointr_nofail(fd);
+                        safe_close(fd);
                         return -errno;
                 }
 
@@ -676,7 +676,7 @@ _public_ int sd_login_monitor_new(const char *category, sd_login_monitor **m) {
         if (!category || streq(category, "machine")) {
                 k = inotify_add_watch(fd, "/run/systemd/machines/", IN_MOVED_TO|IN_DELETE);
                 if (k < 0) {
-                        close_nointr_nofail(fd);
+                        safe_close(fd);
                         return -errno;
                 }
 

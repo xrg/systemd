@@ -159,6 +159,7 @@ AM_CPPFLAGS = \
 	-DSYSTEMD_TTY_ASK_PASSWORD_AGENT_BINARY_PATH=\"$(rootbindir)/systemd-tty-ask-password-agent\" \
 	-DSYSTEMD_STDIO_BRIDGE_BINARY_PATH=\"$(bindir)/systemd-stdio-bridge\" \
 	-DROOTPREFIX=\"$(rootprefix)\" \
+	-DRANDOM_SEED_DIR=\"$(localstatedir)/lib/systemd/\" \
 	-DRANDOM_SEED=\"$(localstatedir)/lib/systemd/random-seed\" \
 	-DSYSTEMD_CRYPTSETUP_PATH=\"$(rootlibexecdir)/systemd-cryptsetup\" \
 	-DSYSTEM_GENERATOR_PATH=\"$(systemgeneratordir)\" \
@@ -339,22 +340,43 @@ systemd_analyze_LDADD = \
 
 dist_bashcompletion_DATA = \
 	shell-completion/bash/journalctl \
-	shell-completion/bash/systemctl \
 	shell-completion/bash/systemd-analyze \
+	shell-completion/bash/systemd-cat \
+	shell-completion/bash/systemd-cgls \
+	shell-completion/bash/systemd-cgtop \
+	shell-completion/bash/systemd-delta \
+	shell-completion/bash/systemd-detect-virt \
+	shell-completion/bash/systemd-nspawn \
 	shell-completion/bash/systemd-run \
 	shell-completion/bash/udevadm \
 	shell-completion/bash/kernel-install
 
+nodist_bashcompletion_DATA = \
+	shell-completion/bash/systemctl
+
 dist_zshcompletion_DATA = \
-	shell-completion/zsh/_systemctl \
 	shell-completion/zsh/_journalctl \
 	shell-completion/zsh/_udevadm \
 	shell-completion/zsh/_kernel-install \
 	shell-completion/zsh/_systemd-nspawn \
 	shell-completion/zsh/_systemd-analyze \
+	shell-completion/zsh/_systemd-run \
 	shell-completion/zsh/_sd_hosts_or_user_at_host \
+	shell-completion/zsh/_sd_outputmodes \
+	shell-completion/zsh/_sd_unit_files \
 	shell-completion/zsh/_systemd-delta \
 	shell-completion/zsh/_systemd
+
+nodist_zshcompletion_DATA = \
+	shell-completion/zsh/_systemctl
+
+EXTRA_DIST += \
+	shell-completion/bash/systemctl.in \
+	shell-completion/zsh/_systemctl.in
+
+CLEANFILES += \
+	$(nodist_bashcompletion_DATA) \
+	$(nodist_zshcompletion_DATA)
 
 dist_sysctl_DATA = \
 	sysctl.d/50-default.conf
@@ -467,7 +489,7 @@ EXTRA_DIST += \
 	units/serial-getty@.service.m4 \
 	units/console-shell.service.m4.in \
 	units/console-getty.service.m4.in \
-	units/rescue.service.m4.in \
+	units/rescue.service.in \
 	units/systemd-initctl.service.in \
 	units/systemd-shutdownd.service.in \
 	units/systemd-remount-fs.service.in \
@@ -502,8 +524,7 @@ EXTRA_DIST += \
 
 CLEANFILES += \
 	units/console-shell.service.m4 \
-	units/console-getty.service.m4 \
-	units/rescue.service.m4
+	units/console-getty.service.m4
 
 if HAVE_SYSV_COMPAT
 nodist_systemunit_DATA += \
@@ -647,6 +668,7 @@ libsystemd_shared_la_SOURCES = \
 	src/shared/sparse-endian.h \
 	src/shared/util.c \
 	src/shared/util.h \
+	src/shared/udev-util.h \
 	src/shared/virt.c \
 	src/shared/virt.h \
 	src/shared/efivars.c \
@@ -723,7 +745,9 @@ libsystemd_shared_la_SOURCES = \
 	src/shared/boot-timestamps.c \
 	src/shared/refcnt.h \
 	src/shared/mkdir.c \
-	src/shared/mkdir.h
+	src/shared/mkdir.h \
+	src/shared/ptyfwd.c \
+	src/shared/ptyfwd.h
 
 #-------------------------------------------------------------------------------
 noinst_LTLIBRARIES += \
@@ -1130,6 +1154,7 @@ tests += \
 	test-unit-file \
 	test-utf8 \
 	test-util \
+	test-namespace \
 	test-date \
 	test-sleep \
 	test-replace-var \
@@ -1254,6 +1279,12 @@ test_util_CFLAGS = \
 	$(AM_CFLAGS)
 
 test_util_LDADD = \
+	libsystemd-core.la
+
+test_namespace_SOURCES = \
+	src/test/test-namespace.c
+
+test_namespace_LDADD = \
 	libsystemd-core.la
 
 test_hashmap_SOURCES = \
@@ -1587,6 +1618,7 @@ nodist_systemunit_DATA += \
 
 dist_tmpfiles_DATA = \
 	tmpfiles.d/systemd.conf \
+	tmpfiles.d/systemd-nologin.conf \
 	tmpfiles.d/tmp.conf \
 	tmpfiles.d/x11.conf
 
@@ -1733,6 +1765,13 @@ bootctl_LDADD = \
 
 bin_PROGRAMS += \
 	bootctl
+
+dist_bashcompletion_DATA += \
+	shell-completion/bash/bootctl
+
+dist_zshcompletion_DATA += \
+	shell-completion/zsh/_bootctl
+
 endif
 
 # ------------------------------------------------------------------------------
@@ -2198,9 +2237,9 @@ INSTALL_DIRS += \
 	$(sysconfdir)/udev/hwdb.d
 
 dist_udevrules_DATA += \
-	rules/99-systemd.rules \
 	rules/42-usb-hid-pm.rules \
 	rules/50-udev-default.rules \
+	rules/60-drm.rules \
 	rules/60-keyboard.rules \
 	rules/60-persistent-storage-tape.rules \
 	rules/60-persistent-serial.rules \
@@ -2213,6 +2252,9 @@ dist_udevrules_DATA += \
 	rules/78-sound-card.rules \
 	rules/80-net-name-slot.rules \
 	rules/95-udev-late.rules
+
+nodist_udevrules_DATA += \
+	rules/99-systemd.rules
 
 dist_udevhwdb_DATA = \
 	hwdb/20-pci-vendor-model.hwdb \
@@ -2653,16 +2695,6 @@ typelibs_DATA = \
 
 CLEANFILES += $(gir_DATA) $(typelibs_DATA)
 endif # HAVE_INTROSPECTION
-
-# move lib from $(libdir) to $(rootlibdir) and update devel link, if needed
-libgudev-install-hook:
-	libname=libgudev-1.0.so && $(move-to-rootlibdir)
-
-libgudev-uninstall-hook:
-	rm -f $(DESTDIR)$(rootlibdir)/libgudev-1.0.so*
-
-INSTALL_EXEC_HOOKS += libgudev-install-hook
-UNINSTALL_EXEC_HOOKS += libgudev-uninstall-hook
 endif
 
 EXTRA_DIST += \
@@ -3385,7 +3417,8 @@ systemgenerator_PROGRAMS += \
 	systemd-cryptsetup-generator
 
 dist_systemunit_DATA += \
-	units/cryptsetup.target
+	units/cryptsetup.target \
+	units/cryptsetup-pre.target
 
 systemd_cryptsetup_SOURCES = \
 	src/cryptsetup/cryptsetup.c
@@ -3707,6 +3740,9 @@ machinectl_LDADD = \
 
 rootbin_PROGRAMS += \
 	machinectl
+
+dist_bashcompletion_DATA += \
+	shell-completion/bash/machinectl
 
 test_machine_tables_SOURCES = \
 	src/machine/test-machine-tables.c
@@ -4226,6 +4262,7 @@ substitutions = \
        '|PACKAGE_VERSION=$(PACKAGE_VERSION)|' \
        '|PACKAGE_NAME=$(PACKAGE_NAME)|' \
        '|PACKAGE_URL=$(PACKAGE_URL)|' \
+       '|RANDOM_SEED_DIR=$(localstatedir)/lib/systemd/|' \
        '|RANDOM_SEED=$(localstatedir)/lib/systemd/random-seed|' \
        '|prefix=$(prefix)|' \
        '|exec_prefix=$(exec_prefix)|' \
@@ -4269,6 +4306,9 @@ src/core/macros.%: src/core/macros.%.in Makefile
 	$(SED_PROCESS)
 
 src/%.policy.in: src/%.policy.in.in Makefile
+	$(SED_PROCESS)
+
+shell-completion/%: shell-completion/%.in
 	$(SED_PROCESS)
 
 %.rules: %.rules.in Makefile

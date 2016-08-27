@@ -145,6 +145,12 @@ static int free_and_set(char **s, const char *v) {
         return 0;
 }
 
+static bool startswith_comma(const char *s, const char *prefix) {
+        const char *t;
+
+        return s && (t = startswith(s, prefix)) && (*t == ',');
+}
+
 static void free_data_locale(void) {
         int p;
 
@@ -337,9 +343,11 @@ static int read_data(void) {
         return r < 0 ? r : q < 0 ? q : p;
 }
 
-static int write_data_locale(void) {
+static int write_data_locale(char ***settings) {
         int r, p;
-        char **l = NULL;
+        _cleanup_strv_free_ char **l = NULL;
+
+        /* Set values will be returned as strv in *settings on success. */
 
         r = load_env_file("/etc/locale.conf", NULL, &l);
         if (r < 0 && r != -ENOENT)
@@ -355,14 +363,12 @@ static int write_data_locale(void) {
                         continue;
                 }
 
-                if (asprintf(&t, "%s=%s", names[p], data[p]) < 0) {
-                        strv_free(l);
+                if (asprintf(&t, "%s=%s", names[p], data[p]) < 0)
                         return -ENOMEM;
-                }
+
 
                 u = strv_env_set(l, t);
                 free(t);
-                strv_free(l);
 
                 if (!u)
                         return -ENOMEM;
@@ -371,8 +377,6 @@ static int write_data_locale(void) {
         }
 
         if (strv_isempty(l)) {
-                strv_free(l);
-
                 if (unlink("/etc/locale.conf") < 0)
                         return errno == ENOENT ? 0 : -errno;
 
@@ -380,7 +384,11 @@ static int write_data_locale(void) {
         }
 
         r = write_env_file_label("/etc/locale.conf", l);
-        strv_free(l);
+        if (r < 0)
+                return r;
+
+        *settings = l;
+        l = NULL;
 
         return r;
 }
@@ -768,8 +776,16 @@ static int convert_vconsole_to_x11(DBusConnection *connection) {
                 int r;
 
                 r = write_data_x11();
-                if (r < 0)
+                if (r < 0) {
                         log_error("Failed to set X11 keyboard layout: %s", strerror(-r));
+                        return r;
+                }
+
+                log_info("Changed X11 keyboard layout to '%s' model '%s' variant '%s' options '%s'",
+                         strempty(state.x11_layout),
+                         strempty(state.x11_model),
+                         strempty(state.x11_variant),
+                         strempty(state.x11_options));
 
                 changed = bus_properties_changed_new(
                                 "/org/freedesktop/locale1",
@@ -787,6 +803,133 @@ static int convert_vconsole_to_x11(DBusConnection *connection) {
 
                 if (!b)
                         return -ENOMEM;
+        } else
+                log_debug("X11 keyboard layout was not modified.");
+
+        return 0;
+}
+
+static int find_converted_keymap(const char *x11_layout, const char *x11_variant, char **new_keymap) {
+        const char *dir;
+        _cleanup_free_ char *n;
+
+        if (x11_variant)
+                n = strjoin(x11_layout, "-", x11_variant, NULL);
+        else
+                n = strdup(x11_layout);
+        if (!n)
+                return -ENOMEM;
+
+        NULSTR_FOREACH(dir, KBD_KEYMAP_DIRS) {
+                _cleanup_free_ char *p = NULL, *pz = NULL;
+                bool uncompressed;
+
+                p = strjoin(dir, "xkb/", n, ".map", NULL);
+                pz = strjoin(dir, "xkb/", n, ".map.gz", NULL);
+                if (!p || !pz)
+                        return -ENOMEM;
+
+                uncompressed = access(p, F_OK) == 0;
+                if (uncompressed || access(pz, F_OK) == 0) {
+                        log_debug("Found converted keymap %s at %s",
+                                  n, uncompressed ? p : pz);
+
+                        *new_keymap = n;
+                        n = NULL;
+                        return 1;
+                }
+        }
+
+        return 0;
+}
+
+static int find_legacy_keymap(char **new_keymap) {
+        _cleanup_fclose_ FILE *f;
+        unsigned n = 0;
+        unsigned best_matching = 0;
+        int r;
+
+        f = fopen(SYSTEMD_KBD_MODEL_MAP, "re");
+        if (!f)
+                return -errno;
+
+        for (;;) {
+                _cleanup_strv_free_ char **a = NULL;
+                unsigned matching = 0;
+
+                r = read_next_mapping(f, &n, &a);
+                if (r < 0)
+                        return r;
+                if (r == 0)
+                        break;
+
+                /* Determine how well matching this entry is */
+                if (streq_ptr(state.x11_layout, a[1]))
+                        /* If we got an exact match, this is best */
+                        matching = 10;
+                else {
+                        /* We have multiple X layouts, look for an
+                         * entry that matches our key with everything
+                         * but the first layout stripped off. */
+                        if (startswith_comma(state.x11_layout, a[1]))
+                                matching = 5;
+                        else  {
+                                char *x;
+
+                                /* If that didn't work, strip off the
+                                 * other layouts from the entry, too */
+                                x = strndupa(a[1], strcspn(a[1], ","));
+                                if (startswith_comma(state.x11_layout, x))
+                                        matching = 1;
+                        }
+                }
+
+                if (matching > 0 &&
+                    streq_ptr(state.x11_model, a[2])) {
+                        matching++;
+
+                        if (streq_ptr(state.x11_variant, a[3])) {
+                                matching++;
+
+                                if (streq_ptr(state.x11_options, a[4]))
+                                        matching++;
+                        }
+                }
+
+                /* The best matching entry so far, then let's save that */
+                if (matching >= MAX(best_matching, 1u)) {
+                        log_debug("Found legacy keymap %s with score %u",
+                                  a[0], matching);
+
+                        if (matching > best_matching) {
+                                best_matching = matching;
+
+                                free(*new_keymap);
+                                *new_keymap = strdup(a[0]);
+
+                                if (!*new_keymap)
+                                        return -ENOMEM;
+                        }
+                }
+        }
+
+        if (best_matching < 10 && state.x11_layout) {
+                /* The best match is only the first part of the X11
+                 * keymap. Check if we have a converted map which
+                 * matches just the first layout.
+                 */
+                char *l, *v = NULL, *converted;
+
+                l = strndupa(state.x11_layout, strcspn(state.x11_layout, ","));
+                if (state.x11_variant)
+                        v = strndupa(state.x11_variant, strcspn(state.x11_variant, ","));
+                r = find_converted_keymap(l, v, &converted);
+                if (r < 0)
+                        return r;
+                if (r > 0) {
+                        free(*new_keymap);
+                        *new_keymap = converted;
+                }
         }
 
         return 0;
@@ -794,6 +937,7 @@ static int convert_vconsole_to_x11(DBusConnection *connection) {
 
 static int convert_x11_to_vconsole(DBusConnection *connection) {
         bool modified = false;
+        int r;
 
         assert(connection);
 
@@ -805,92 +949,16 @@ static int convert_x11_to_vconsole(DBusConnection *connection) {
 
                 free_data_x11();
         } else {
-                FILE *f;
-                unsigned n = 0;
-                unsigned best_matching = 0;
                 char *new_keymap = NULL;
 
-                f = fopen(SYSTEMD_KBD_MODEL_MAP, "re");
-                if (!f)
-                        return -errno;
-
-                for (;;) {
-                        char **a;
-                        unsigned matching = 0;
-                        int r;
-
-                        r = read_next_mapping(f, &n, &a);
-                        if (r < 0) {
-                                fclose(f);
+                r = find_converted_keymap(state.x11_layout, state.x11_variant, &new_keymap);
+                if (r < 0)
+                        return r;
+                else if (r == 0) {
+                        r = find_legacy_keymap(&new_keymap);
+                        if (r < 0)
                                 return r;
-                        }
-
-                        if (r == 0)
-                                break;
-
-                        /* Determine how well matching this entry is */
-                        if (streq_ptr(state.x11_layout, a[1]))
-                                /* If we got an exact match, this is best */
-                                matching = 10;
-                        else {
-                                size_t x;
-
-                                x = strcspn(state.x11_layout, ",");
-
-                                /* We have multiple X layouts, look
-                                 * for an entry that matches our key
-                                 * with the everything but the first
-                                 * layout stripped off. */
-                                if (x > 0 &&
-                                    strlen(a[1]) == x &&
-                                    strneq(state.x11_layout, a[1], x))
-                                        matching = 5;
-                                else  {
-                                        size_t w;
-
-                                        /* If that didn't work, strip
-                                         * off the other layouts from
-                                         * the entry, too */
-
-                                        w = strcspn(a[1], ",");
-
-                                        if (x > 0 && x == w &&
-                                            memcmp(state.x11_layout, a[1], x) == 0)
-                                                matching = 1;
-                                }
-                        }
-
-                        if (matching > 0 &&
-                            streq_ptr(state.x11_model, a[2])) {
-                                matching++;
-
-                                if (streq_ptr(state.x11_variant, a[3])) {
-                                        matching++;
-
-                                        if (streq_ptr(state.x11_options, a[4]))
-                                                matching++;
-                                }
-                        }
-
-                        /* The best matching entry so far, then let's
-                         * save that */
-                        if (matching > best_matching) {
-                                best_matching = matching;
-
-                                free(new_keymap);
-                                new_keymap = strdup(a[0]);
-
-                                if (!new_keymap) {
-                                        strv_free(a);
-                                        fclose(f);
-                                        return -ENOMEM;
-                                }
-                        }
-
-                        strv_free(a);
                 }
-
-                fclose(f);
 
                 if (!streq_ptr(state.vc_keymap, new_keymap)) {
                         free(state.vc_keymap);
@@ -907,11 +975,13 @@ static int convert_x11_to_vconsole(DBusConnection *connection) {
         if (modified) {
                 dbus_bool_t b;
                 DBusMessage *changed;
-                int r;
 
                 r = write_data_vconsole();
                 if (r < 0)
                         log_error("Failed to set virtual console keymap: %s", strerror(-r));
+
+                log_info("Changed virtual console keymap to '%s' toggle '%s'",
+                         strempty(state.vc_keymap), strempty(state.vc_keymap_toggle));
 
                 changed = bus_properties_changed_new(
                                 "/org/freedesktop/locale1",
@@ -929,7 +999,8 @@ static int convert_x11_to_vconsole(DBusConnection *connection) {
                         return -ENOMEM;
 
                 return load_vconsole_keymap(connection, NULL);
-        }
+        } else
+                log_debug("Virtual console keymap was not modified.");
 
         return 0;
 }
@@ -938,6 +1009,7 @@ static int append_locale(DBusMessageIter *i, const char *property, void *userdat
         int r, c = 0, p;
         char **l;
 
+        /* Check whether a variable changed and if it is valid */
         l = new0(char*, _PROP_MAX+1);
         if (!l)
                 return -ENOMEM;
@@ -1056,6 +1128,7 @@ static DBusHandlerResult locale_message_handler(
                 }
 
                 if (modified) {
+                        _cleanup_strv_free_ char **settings = NULL;
 
                         r = verify_polkit(connection, message, "org.freedesktop.locale1.set-locale", interactive, NULL, &error);
                         if (r < 0) {
@@ -1097,7 +1170,7 @@ static DBusHandlerResult locale_message_handler(
 
                         simplify();
 
-                        r = write_data_locale();
+                        r = write_data_locale(&settings);
                         if (r < 0) {
                                 log_error("Failed to set locale: %s", strerror(-r));
                                 return bus_send_error_reply(connection, message, NULL, r);
@@ -1105,7 +1178,13 @@ static DBusHandlerResult locale_message_handler(
 
                         push_data(connection);
 
-                        log_info("Changed locale information.");
+                        if (settings) {
+                                _cleanup_free_ char *line;
+
+                                line = strv_join(settings, ", ");
+                                log_info("Changed locale to %s.", strnull(line));
+                        } else
+                                log_info("Changed locale to unset.");
 
                         changed = bus_properties_changed_new(
                                         "/org/freedesktop/locale1",
@@ -1113,8 +1192,10 @@ static DBusHandlerResult locale_message_handler(
                                         "Locale\0");
                         if (!changed)
                                 goto oom;
-                } else
+                } else {
+                        log_debug("Locale settings were not modified.");
                         strv_free(l);
+                }
 
         } else if (dbus_message_is_method_call(message, "org.freedesktop.locale1", "SetVConsoleKeyboard")) {
 
@@ -1158,7 +1239,8 @@ static DBusHandlerResult locale_message_handler(
                                 return bus_send_error_reply(connection, message, NULL, r);
                         }
 
-                        log_info("Changed virtual console keymap to '%s'", strempty(state.vc_keymap));
+                        log_info("Changed virtual console keymap to '%s' toggle '%s'",
+                                 strempty(state.vc_keymap), strempty(state.vc_keymap_toggle));
 
                         r = load_vconsole_keymap(connection, NULL);
                         if (r < 0)
@@ -1236,7 +1318,10 @@ static DBusHandlerResult locale_message_handler(
                                 return bus_send_error_reply(connection, message, NULL, r);
                         }
 
-                        log_info("Changed X11 keyboard layout to '%s'", strempty(state.x11_layout));
+                        log_info("Changed X11 keyboard layout to '%s' model '%s' variant '%s' options '%s'", strempty(state.x11_layout),
+                                 strempty(state.x11_model),
+                                 strempty(state.x11_variant),
+                                 strempty(state.x11_options));
 
                         changed = bus_properties_changed_new(
                                         "/org/freedesktop/locale1",

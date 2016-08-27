@@ -272,7 +272,7 @@ static void worker_new(struct event *event)
                 for (;;) {
                         struct udev_event *udev_event;
                         struct worker_message msg;
-                        int err;
+                        int err = 0;
 
                         log_debug("seq %llu running\n", udev_device_get_seqnum(dev));
                         udev_event = udev_event_new(dev);
@@ -288,13 +288,12 @@ static void worker_new(struct event *event)
                                 udev_event->exec_delay = exec_delay;
 
                         /* apply rules, create node, symlinks */
-                        err = udev_event_execute_rules(udev_event, rules, &sigmask_orig);
+                        udev_event_execute_rules(udev_event, rules, &sigmask_orig);
 
-                        if (err == 0)
-                                udev_event_execute_run(udev_event, &sigmask_orig);
+                        udev_event_execute_run(udev_event, &sigmask_orig);
 
                         /* apply/restore inotify watch */
-                        if (err == 0 && udev_event->inotify_watch) {
+                        if (udev_event->inotify_watch) {
                                 udev_watch_begin(udev, dev);
                                 udev_device_update_db(dev);
                         }
@@ -1241,7 +1240,7 @@ int main(int argc, char *argv[])
                                 break;
 
                         /* timeout at exit for workers to finish */
-                        timeout = 30 * 1000;
+                        timeout = 180 * 1000;
                 } else if (udev_list_node_is_empty(&event_list) && !children) {
                         /* we are idle */
                         timeout = -1;
@@ -1279,7 +1278,7 @@ int main(int argc, char *argv[])
                                 if (worker->state != WORKER_RUNNING)
                                         continue;
 
-                                if ((now(CLOCK_MONOTONIC) - worker->event_start_usec) > 30 * 1000 * 1000) {
+                                if ((now(CLOCK_MONOTONIC) - worker->event_start_usec) > 180 * 1000 * 1000) {
                                         log_error("worker [%u] %s timeout; kill it\n", worker->pid,
                                             worker->event ? worker->event->devpath : "<idle>");
                                         kill(worker->pid, SIGKILL);

@@ -262,12 +262,12 @@ static void do_journal_append(char *file)
 
         f = open(file, O_RDONLY);
         if (f < 0) {
-                log_error("Failed to read bootchart data: %m\n");
+                log_error("Failed to read bootchart data: %m");
                 return;
         }
         n = loop_read(f, p + 10, BOOTCHART_MAX, false);
         if (n < 0) {
-                log_error("Failed to read bootchart data: %s\n", strerror(-n));
+                log_error("Failed to read bootchart data: %s", strerror(-n));
                 close(f);
                 return;
         }
@@ -346,8 +346,8 @@ int main(int argc, char *argv[]) {
 
                 sampledata = new0(struct list_sample_data, 1);
                 if (sampledata == NULL) {
-                        log_error("Failed to allocate memory for a node: %m");
-                        return -1;
+                        log_oom();
+                        return EXIT_FAILURE;
                 }
 
                 sampledata->sampletime = gettime_ns();
@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
                 exit (EXIT_FAILURE);
         }
 
-        svg_do(build);
+        svg_do(strna(build));
 
         fprintf(stderr, "systemd-bootchart wrote %s\n", output_file);
 

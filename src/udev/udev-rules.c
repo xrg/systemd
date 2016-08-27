@@ -900,6 +900,7 @@ static int rule_add_key(struct rule_tmp *rule_tmp, enum token_type type,
         case TK_A_GOTO:
         case TK_M_TAG:
         case TK_A_TAG:
+        case TK_A_STATIC_NODE:
                 token->key.value_off = rules_add_string(rule_tmp->rules, value);
                 break;
         case TK_M_IMPORT_BUILTIN:
@@ -941,9 +942,6 @@ static int rule_add_key(struct rule_tmp *rule_tmp, enum token_type type,
                 break;
         case TK_A_MODE_ID:
                 token->key.mode = *(mode_t *)data;
-                break;
-        case TK_A_STATIC_NODE:
-                token->key.value_off = rules_add_string(rule_tmp->rules, value);
                 break;
         case TK_M_EVENT_TIMEOUT:
                 token->key.event_timeout = *(int *)data;
@@ -992,7 +990,7 @@ static int rule_add_key(struct rule_tmp *rule_tmp, enum token_type type,
         }
 
         if (attr != NULL) {
-                /* check if property/attribut name has substitution chars */
+                /* check if property/attribute name has substitution chars */
                 if (attr[0] == '[')
                         token->key.attrsubst = SB_SUBSYS;
                 else if (strchr(attr, '%') != NULL || strchr(attr, '$') != NULL)
@@ -1516,9 +1514,8 @@ invalid:
         return -1;
 }
 
-static int parse_file(struct udev_rules *rules, const char *filename)
-{
-        FILE *f;
+static int parse_file(struct udev_rules *rules, const char *filename) {
+        _cleanup_fclose_ FILE *f = NULL;
         unsigned int first_token;
         unsigned int filename_off;
         char line[UTIL_LINE_SIZE];
@@ -1572,7 +1569,6 @@ static int parse_file(struct udev_rules *rules, const char *filename)
                 }
                 add_rule(rules, key, filename, filename_off, line_nr);
         }
-        fclose(f);
 
         /* link GOTOs to LABEL rules in this file to be able to fast-forward */
         for (i = first_token+1; i < rules->token_cur; i++) {
@@ -1630,7 +1626,7 @@ struct udev_rules *udev_rules_new(struct udev *udev, int resolve_names)
                 log_error("failed to build config directory array");
                 return udev_rules_unref(rules);
         }
-        if (!path_strv_canonicalize(rules->dirs)) {
+        if (!path_strv_canonicalize_absolute(rules->dirs, NULL)) {
                 log_error("failed to canonicalize config directories\n");
                 return udev_rules_unref(rules);
         }
@@ -2060,7 +2056,7 @@ int udev_rules_apply_to_event(struct udev_rules *rules, struct udev_event *event
                 case TK_M_PROGRAM: {
                         char program[UTIL_PATH_SIZE];
                         char **envp;
-                        char result[UTIL_PATH_SIZE];
+                        char result[UTIL_LINE_SIZE];
 
                         free(event->program_result);
                         event->program_result = NULL;
@@ -2574,17 +2570,18 @@ int udev_rules_apply_static_dev_perms(struct udev_rules *rules)
                         struct stat stats;
 
                         /* we assure, that the permissions tokens are sorted before the static token */
+
                         if (mode == 0 && uid == 0 && gid == 0 && tags == NULL)
                                 goto next;
+
                         strscpyl(device_node, sizeof(device_node), "/dev/", rules_str(rules, cur->key.value_off), NULL);
                         if (stat(device_node, &stats) != 0)
-                                goto next;
+                                break;
                         if (!S_ISBLK(stats.st_mode) && !S_ISCHR(stats.st_mode))
-                                goto next;
+                                break;
 
+                        /* export the tags to a directory as symlinks, allowing otherwise dead nodes to be tagged */
                         if (tags) {
-                                /* Export the tags to a directory as symlinks, allowing otherwise dead nodes to be tagged */
-
                                 STRV_FOREACH(t, tags) {
                                         _cleanup_free_ char *unescaped_filename = NULL;
 
@@ -2609,7 +2606,7 @@ int udev_rules_apply_static_dev_perms(struct udev_rules *rules)
 
                         /* don't touch the permissions if only the tags were set */
                         if (mode == 0 && uid == 0 && gid == 0)
-                                goto next;
+                                break;
 
                         if (mode == 0) {
                                 if (gid > 0)

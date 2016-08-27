@@ -45,7 +45,7 @@
 #include "libudev-private.h"
 #include "log.h"
 
-#define COMMAND_TIMEOUT_MSEC (30 * 1000)
+#define COMMAND_TIMEOUT_MSEC (180 * 1000)
 
 static int disk_scsi_inquiry_command(int      fd,
                                      void    *buf,
@@ -462,14 +462,14 @@ int main(int argc, char *argv[])
 
         node = argv[optind];
         if (node == NULL) {
-                log_error("no node specified\n");
+                log_error("no node specified");
                 rc = 1;
                 goto exit;
         }
 
         fd = open(node, O_RDONLY|O_NONBLOCK);
         if (fd < 0) {
-                log_error("unable to open '%s'\n", node);
+                log_error("unable to open '%s'", node);
                 rc = 1;
                 goto exit;
         }
@@ -501,7 +501,7 @@ int main(int argc, char *argv[])
         } else {
                 /* If this fails, then try HDIO_GET_IDENTITY */
                 if (ioctl(fd, HDIO_GET_IDENTITY, &id) != 0) {
-                        log_info("HDIO_GET_IDENTITY failed for '%s': %m\n", node);
+                        log_debug("HDIO_GET_IDENTITY failed for '%s': %m", node);
                         rc = 2;
                         goto close;
                 }
