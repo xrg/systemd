@@ -1,3 +1,6 @@
+%define git_repo systemd
+%define git_head HEAD
+
 %define subrel 6
 
 %define libdaemon_major 0
@@ -22,23 +25,18 @@
 
 Summary:	A System and Session Manager
 Name:		systemd
-Version:	208
-Release:	%mkrel 10
+Version:	%git_get_ver
+Release:	%mkrel %git_get_rel2
 License:	GPLv2+
 Group:		System/Boot and Init
 Url:		http://www.freedesktop.org/wiki/Software/systemd
-Source0:	http://www.freedesktop.org/software/systemd/%{name}-%{version}.tar.xz
+Source:		%git_bs_source %{name}-%{version}.tar.gz
+Source1:	%{name}-gitrpm.version
+Source2:	%{name}-changelog.gitrpm.txt
 
-Source10: 50-udev-mageia.rules
-Source11: 69-printeracl.rules
 # (hk) udev rules for zte 3g modems with drakx-net
-Source12: 61-mobile-zte-drakx-net.rules
 
 # (blino) net rules and helpers
-Source20: 81-net.rules
-Source21: udev_net_create_ifcfg
-Source22: udev_net_action
-Source23: udev_net.sysconfig
 
 # (cg) "Stable" Patches for v208 from http://cgit.freedesktop.org/systemd/systemd-stable/log/?h=v208-stable
 # (cg) Generated with 'git diff v208..bae1169dbfc807f7294c5ca18229a59976aa828f'
@@ -52,28 +50,10 @@ Source23: udev_net.sysconfig
 #     udev: bump event timeout in two more places
 #
 #     https://bugzilla.redhat.com/show_bug.cgi?id=1091513
-Source001: 0001-v208-stable.patch.xz
-Patch002:  0002-journal-call-connect-with-dropped-privileges.patch 
-Patch003:  0003-logind-fix-sd_eviocrevoke-ioctl-call.patch
 
 
 # (cg/bor) clean up directories on boot as done by rc.sysinit
 # - Lennart should be poked about this (he couldn't think why he hadn't done it already)
-Patch900: 0900-Clean-directories-that-were-cleaned-up-by-rc.sysinit.patch
-Patch901: 0901-main-Add-failsafe-to-the-sysvinit-compat-cmdline-key.patch
-Patch902: 0902-mageia-Fallback-message-when-display-manager-fails.patch
-Patch903: 0903-Disable-modprobe-pci-devices-on-coldplug-for-storage.patch
-Patch904: 0904-Allow-booting-from-live-cd-in-virtualbox.patch
-Patch905: 0905-reinstate-TIMEOUT-handling.patch
-Patch906: 0906-udev-Allow-the-udevadm-settle-timeout-to-be-set-via-.patch
-Patch907: 0907-Mageia-Relax-perms-on-sys-kernel-debug-for-lspcidrak.patch
-Patch908: 0908-udev-rules-Apply-SuSE-patch-to-restore-cdrom-cdrw-dv.patch
-Patch909: 0909-pam_systemd-Always-reset-XDG_RUNTIME_DIR.patch
-Patch910: 0910-logind-Partial-backport-of-cc377381.patch
-Patch911: 0911-pam-Suppress-errors-in-the-SuSE-patch-to-unset-XDG_R.patch
-Patch912: 0912-Revert-systemctl-skip-native-unit-file-handling-if-s.patch
-Patch913: 0913-systemctl-Do-not-attempt-native-calls-for-enable-dis.patch
-Patch914: 0914-systemctl-Ensure-the-no-reload-and-no-redirect-optio.patch
 
 BuildRequires:	dbus-devel >= 1.4.0
 BuildRequires:	libcap-devel
@@ -299,9 +279,9 @@ This package provides the development files for the gudev shared library.
 
 
 %prep
+%git_get_source
 %setup -q
-xzcat %{SOURCE1} | /usr/bin/patch -U -s -p1 --fuzz=0
-%apply_patches
+xzcat contrib/mageia/0001-v208-stable.patch.xz | /usr/bin/patch -U -s -p1 --fuzz=0
 find src/ -name "*.vala" -exec touch '{}' \;
 
 %build
@@ -324,17 +304,17 @@ find %{buildroot} \( -name '*.a' -o -name '*.la' \) -exec rm {} \;
 # (cg) Create and ship folder to hold user rules
 install -d -m 755 %{buildroot}%{_sysconfdir}/udev/rules.d
 
-install -m 644 %SOURCE10 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 644 %SOURCE11 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/50-udev-mageia.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/69-printeracl.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 # udev rules for zte 3g modems and drakx-net
-install -m 0644 %SOURCE12 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0644 contrib/mageia/61-mobile-zte-drakx-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 
 # net rules
-install -m 0644 %SOURCE20 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 0755 %SOURCE21 %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
-install -m 0755 %SOURCE22 %{buildroot}%{_prefix}/lib/udev/net_action
+install -m 0644 contrib/mageia/81-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0755 contrib/mageia/udev_net_create_ifcfg %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
+install -m 0755 contrib/mageia/udev_net_action %{buildroot}%{_prefix}/lib/udev/net_action
 install -m 0755 -d %{buildroot}%{_sysconfdir}/sysconfig
-install -m 0644 %SOURCE23 %{buildroot}%{_sysconfdir}/sysconfig/udev_net
+install -m 0644 contrib/mageia/udev_net.sysconfig %{buildroot}%{_sysconfdir}/sysconfig/udev_net
 
 
 # Create SysV compatibility symlinks. systemctl/systemd are smart
