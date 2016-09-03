@@ -23,3 +23,4 @@ ExecStop=/bin/kill -TERM ${MAINPID}
 KillSignal=SIGCONT
 Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%I/dbus/user_bus_socket
 Slice=user-%i.slice
+Delegate=yes
