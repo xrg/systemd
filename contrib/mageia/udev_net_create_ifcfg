@@ -1,0 +1,25 @@
+#!/bin/sh
+
+[ -z "$INTERFACE" ] && exit 0
+
+CFG=/etc/sysconfig/network-scripts/ifcfg-$INTERFACE
+[ -r $CFG ] && exit 0
+
+[ -r /etc/sysconfig/udev_net ] && . /etc/sysconfig/udev_net
+[ -n "$BLACKLIST_ALL" ] && eval "case $INTERFACE in $BLACKLIST_ALL) exit 1;; esac"
+[ -n "$BLACKLIST_PERSISTENT" ] && eval "case $INTERFACE in $BLACKLIST_PERSISTENT) exit 1;; esac"
+
+# eagle-usb/firewire create a fake ethX interface
+[ "$PHYSDEVDRIVER" = "ne2k-pci" ] || /usr/sbin/ethtool $INTERFACE &>/dev/null || exit 0
+
+# conform to network service (AUTOMATIC_IFCFG)
+[ -r /etc/sysconfig/network ] && . /etc/sysconfig/network
+
+if [ "$AUTOMATIC_IFCFG" != no ]; then
+	debug_mesg creating config file for $INTERFACE
+	cat > $CFG <<EOF
+DEVICE=$INTERFACE
+BOOTPROTO=dhcp
+ONBOOT=yes
+EOF
+fi
