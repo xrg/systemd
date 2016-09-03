@@ -1,0 +1,9 @@
+SUBSYSTEM!="net", GOTO="mga_net_end"
+ENV{INTERFACE}=="", GOTO="mga_net_end"
+
+ACTION=="add", RUN+="net_create_ifcfg"
+ACTION=="add|remove", RUN+="net_action"
+
+LABEL="mga_net_end"
+
+ACTION=="add|remove", SUBSYSTEM=="tty", ENV{ID_USB_DRIVER}=="option", RUN+="/usr/sbin/mdv-network-event $env{ACTION} ppp0"
