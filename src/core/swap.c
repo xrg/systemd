@@ -580,7 +580,6 @@ static int swap_spawn(Swap *s, ExecCommand *c, pid_t *_pid) {
         if (r < 0)
                 goto fail;
 
-        exec_params.cgroup_delegate = s->cgroup_context.delegate;
         r = exec_spawn(c,
                        NULL,
                        &s->exec_context,
@@ -592,6 +591,7 @@ static int swap_spawn(Swap *s, ExecCommand *c, pid_t *_pid) {
                        UNIT(s)->manager->confirm_spawn,
                        UNIT(s)->manager->cgroup_supported,
                        UNIT(s)->cgroup_path,
+                       s->cgroup_context.delegate,
                        UNIT(s)->id,
                        NULL,
                        &pid);

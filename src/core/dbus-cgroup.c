@@ -143,25 +143,24 @@ static int bus_cgroup_set_transient_property(
                 Unit *u,
                 CGroupContext *c,
                 const char *name,
-                sd_bus_message *message,
+                DBusMessageIter *i,
                 UnitSetPropertiesMode mode,
-                sd_bus_error *error) {
-
-        int r;
+                DBusError *error) {
 
         assert(u);
         assert(c);
         assert(name);
-        assert(message);
+        assert(i);
 
         if (streq(name, "Delegate")) {
-                int b;
 
-                r = sd_bus_message_read(message, "b", &b);
-                if (r < 0)
-                        return r;
+                if (dbus_message_iter_get_arg_type(i) != DBUS_TYPE_BOOLEAN)
+                        return -EINVAL;
 
                 if (mode != UNIT_CHECK) {
+                        dbus_bool_t b;
+
+                        dbus_message_iter_get_basic(i, &b);
                         c->delegate = b;
                         unit_write_drop_in_private(u, mode, name, b ? "Delegate=yes" : "Delegate=no");
                 }
@@ -586,7 +585,8 @@ int bus_cgroup_set_property(
         }
 
         if (u->transient && u->load_state == UNIT_STUB) {
-                r = bus_cgroup_set_transient_property(u, c, name, message, mode, error);
+                int r;
+                r = bus_cgroup_set_transient_property(u, c, name, i, mode, error);
                 if (r != 0)
                         return r;
 

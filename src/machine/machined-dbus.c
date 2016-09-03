@@ -739,9 +739,11 @@ int manager_start_scope(
         DBusMessageIter iter, sub, sub2, sub3, sub4;
         const char *timeout_stop_property = "TimeoutStopUSec";
         const char *pids_property = "PIDs";
+        const char *delegate_property = "Delegate";
         uint64_t timeout = 500 * USEC_PER_MSEC;
         const char *fail = "fail";
         uint32_t u;
+        dbus_bool_t b = 1;
         int r;
 
         assert(manager);

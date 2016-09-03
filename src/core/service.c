@@ -1862,7 +1862,6 @@ static int service_spawn(
         } else
                 path = UNIT(s)->cgroup_path;
 
-        exec_params.cgroup_delegate = s->cgroup_context.delegate;
         r = exec_spawn(c,
                        argv,
                        &s->exec_context,
@@ -1874,6 +1873,7 @@ static int service_spawn(
                        UNIT(s)->manager->confirm_spawn,
                        UNIT(s)->manager->cgroup_supported,
                        path,
+                       s->cgroup_context.delegate,
                        UNIT(s)->id,
                        s->type == SERVICE_IDLE ? UNIT(s)->manager->idle_pipe : NULL,
                        &pid);

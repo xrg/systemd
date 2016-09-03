@@ -162,7 +162,6 @@ struct ExecContext {
 
 #include "cgroup.h"
 
-        bool cgroup_delegate;
 int exec_spawn(ExecCommand *command,
                char **argv,
                ExecContext *context,
@@ -174,6 +173,7 @@ int exec_spawn(ExecCommand *command,
                bool confirm_spawn,
                CGroupControllerMask cgroup_mask,
                const char *cgroup_path,
+               bool cgroup_delegate,
                const char *unit_id,
                int pipe_fd[2],
                pid_t *ret);

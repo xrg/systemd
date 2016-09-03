@@ -1065,6 +1065,7 @@ int exec_spawn(ExecCommand *command,
                bool confirm_spawn,
                CGroupControllerMask cgroup_supported,
                const char *cgroup_path,
+               bool cgroup_delegate,
                const char *unit_id,
                int idle_pipe[4],
                pid_t *ret) {
