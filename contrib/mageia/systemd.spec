@@ -1,3 +1,6 @@
+%define git_repo systemd
+%define git_head HEAD
+
 %define libsystemd_major 0
 %define libudev_major 1
 %define libgudev_api 1.0
@@ -19,67 +22,27 @@
 
 Summary:	A System and Session Manager
 Name:		systemd
-Version:	217
+Version:	%git_get_ver
 %define subrel	1
-Release:	%mkrel 11
+Release:	%mkrel %git_get_rel2
 License:	GPLv2+
 Group:		System/Boot and Init
 Url:		http://www.freedesktop.org/wiki/Software/systemd
-Source0:	http://www.freedesktop.org/software/systemd/%{name}-%{version}.tar.xz
+Source:		%git_bs_source %{name}-%{version}.tar.gz
+Source1:	%{name}-gitrpm.version
+Source2:	%{name}-changelog.gitrpm.txt
 
-Source10: 50-udev-mageia.rules
-Source11: 69-printeracl.rules
 # (hk) udev rules for zte 3g modems with drakx-net
-Source12: 61-mobile-zte-drakx-net.rules
 
 # (blino) net rules and helpers
-Source20: 81-net.rules
-Source21: udev_net_create_ifcfg
-Source22: udev_net_action
-Source23: udev_net.sysconfig
 
 # (cg) Upstream cherry picks
 # (not technically upstream yet, but confident it will be...)
-Patch100: 0100-sysusers-Preserve-ownership-and-mode-on-etc-passwd-a.patch
-Patch101: 0101-nspawn-ignore-EEXIST-when-creating-mount-point.patch
-Patch102: 0102-manager-Ensure-user-s-systemd-runtime-directory-exis.patch
-Patch103: 0103-keymap-Ignore-brightness-keys-on-Dell-Inspiron-1520-.patch
-Patch104: 0104-shared-install-avoid-prematurely-rejecting-missing-u.patch
-Patch105: 0105-units-don-t-order-journal-flushing-afte-remote-fs.ta.patch
-Patch106: 0106-units-order-sd-journal-flush-after-sd-remount-fs.patch
-Patch107: 0107-units-make-systemd-journald.service-Type-notify.patch
-Patch108: 0108-udev-hwdb-Change-error-message-regarding-missing-hwd.patch
-Patch109: 0109-shutdown-fix-arguments-to-run-initramfs-shutdown.patch
-Patch110: 0110-systemctl-when-invokes-as-reboot-f-sync.patch
-Patch111: 0111-login-rerun-vconsole-setup-when-switching-from-vgaco.patch
-Patch112: 0112-build-sys-configure-the-list-of-system-users-files-a.patch
-Patch113: 0113-cgroup-Handle-error-when-destroying-cgroup.patch
-Patch114: 0114-journal-call-connect-with-dropped-privileges.patch
-Patch115: 0115-logind-fix-sd_eviocrevoke-ioctl-call.patch
-Patch116: 0116-backport-udev-downgrade-a-few-warnings-to-debug-messages.patch
-Patch117: 0117-everywhere-remove-configurability-of-sysv-runlevel-to-target-mapping.patch
 # (doktor5000) backported from 221, supposedly fixes mga#16396
 # see http://cgit.freedesktop.org/systemd/systemd/commit/?id=41dfeaa194c18de49706b5cecf4e53accd12b7f6 for details
-Patch118: 41dfeaa194c18de49706b5cecf4e53accd12b7f6.patch
 
 # (cg/bor) clean up directories on boot as done by rc.sysinit
 # - Lennart should be poked about this (he couldn't think why he hadn't done it already)
-Patch500: 0500-Clean-directories-that-were-cleaned-up-by-rc.sysinit.patch
-Patch501: 0501-main-Add-failsafe-to-the-sysvinit-compat-cmdline-key.patch
-Patch502: 0502-mageia-Fallback-message-when-display-manager-fails.patch
-Patch503: 0503-Disable-modprobe-pci-devices-on-coldplug-for-storage.patch
-Patch504: 0504-Allow-booting-from-live-cd-in-virtualbox.patch
-Patch505: 0505-reinstate-TIMEOUT-handling.patch
-Patch506: 0506-udev-Allow-the-udevadm-settle-timeout-to-be-set-via-.patch
-Patch507: 0507-Mageia-Relax-perms-on-sys-kernel-debug-for-lspcidrak.patch
-Patch508: 0508-udev-rules-Apply-SuSE-patch-to-restore-cdrom-cdrw-dv.patch
-Patch509: 0509-pam_systemd-Always-reset-XDG_RUNTIME_DIR.patch
-Patch510: 0510-pam-Suppress-errors-in-the-SuSE-patch-to-unset-XDG_R.patch
-Patch511: 0511-Revert-systemctl-skip-native-unit-file-handling-if-s.patch
-Patch512: 0512-systemctl-Do-not-attempt-native-calls-for-enable-dis.patch
-Patch513: 0513-systemctl-Ensure-the-no-reload-and-no-redirect-optio.patch
-Patch514: 0514-Revert-udev-hwdb-Support-shipping-pre-compiled-datab.patch
-Patch515: 0515-Add-path-to-locale-search.patch
 
 BuildRequires:	dbus-devel >= 1.4.0
 BuildRequires:	libcap-devel
@@ -295,8 +258,8 @@ This package provides the development files for the gudev shared library.
 
 
 %prep
+%git_get_source
 %setup -q
-%apply_patches
 find src/ -name "*.vala" -exec touch '{}' \;
 
 %build
@@ -319,17 +282,17 @@ find %{buildroot} \( -name '*.a' -o -name '*.la' \) -exec rm {} \;
 # (cg) Create and ship folder to hold user rules
 install -d -m 755 %{buildroot}%{_sysconfdir}/udev/rules.d
 
-install -m 644 %SOURCE10 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 644 %SOURCE11 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/50-udev-mageia.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/69-printeracl.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 # udev rules for zte 3g modems and drakx-net
-install -m 0644 %SOURCE12 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0644 contrib/mageia/61-mobile-zte-drakx-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 
 # net rules
-install -m 0644 %SOURCE20 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 0755 %SOURCE21 %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
-install -m 0755 %SOURCE22 %{buildroot}%{_prefix}/lib/udev/net_action
+install -m 0644 contrib/mageia/81-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0755 contrib/mageia/udev_net_create_ifcfg %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
+install -m 0755 contrib/mageia/udev_net_action %{buildroot}%{_prefix}/lib/udev/net_action
 install -m 0755 -d %{buildroot}%{_sysconfdir}/sysconfig
-install -m 0644 %SOURCE23 %{buildroot}%{_sysconfdir}/sysconfig/udev_net
+install -m 0644 contrib/mageia/udev_net.sysconfig %{buildroot}%{_sysconfdir}/sysconfig/udev_net
 
 
 # Create SysV compatibility symlinks. systemctl/systemd are smart
