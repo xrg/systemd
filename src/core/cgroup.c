@@ -651,7 +651,7 @@ static int unit_create_cgroups(Unit *u, CGroupControllerMask mask) {
                  * for slice and delegation units. */
                 r = cg_migrate_everywhere(u->manager->cgroup_supported, u->cgroup_path, u->cgroup_path, migrate_callback, u);
                 if (r < 0)
-                        log_warning_errno(r, "Failed to migrate cgroup from to %s: %m", u->cgroup_path);
+                        log_warning("Failed to migrate cgroup from to %s: %m", u->cgroup_path);
         }
 
         return 0;
