@@ -281,10 +281,10 @@ This package provides the development files for the gudev shared library.
 %prep
 %git_get_source
 %setup -q
-xzcat contrib/mageia/0001-v208-stable.patch.xz | /usr/bin/patch -U -s -p1 --fuzz=0
 find src/ -name "*.vala" -exec touch '{}' \;
 
 %build
+./autogen.sh
 autoreconf --force --install --verbose
 %configure2_5x \
   --with-rc-local-script-path-start=/etc/rc.d/rc.local \
