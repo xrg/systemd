@@ -19,6 +19,7 @@
  * Boston, MA  02110-1301  USA
  */
 
+#include <stdint.h>
 #include <mtd/mtd-user.h>
 
 #include "macro.h"
