@@ -263,6 +263,7 @@ This package provides the development files for the gudev shared library.
 find src/ -name "*.vala" -exec touch '{}' \;
 
 %build
+./autogen.sh
 autoreconf --force --install --verbose
 #NO_CONFIGURE=1 ./autogen.sh
 %configure2_5x \
