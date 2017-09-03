@@ -1732,7 +1732,7 @@ int main(int argc, char *argv[]) {
         if (arg_daemonize) {
                 pid_t pid;
 
-                log_info("starting version " VERSION);
+                log_debug("starting version " VERSION);
 
                 /* connect /dev/null to stdin, stdout, stderr */
                 if (log_get_max_level() < LOG_DEBUG)
