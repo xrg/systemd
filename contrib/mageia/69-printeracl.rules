@@ -1,0 +1,6 @@
+# parallel printer and scanner
+KERNEL=="parport[0-9]*",  ENV{ACL_MANAGE}="1"
+SUBSYSTEM=="printer", KERNEL=="lp*", ENV{ACL_MANAGE}="1"
+SUBSYSTEM=="ppdev", ENV{ACL_MANAGE}="1"
+KERNEL=="lp[0-9]*", ENV{ACL_MANAGE}="1"
+KERNEL=="irlpt[0-9]*", ENV{ACL_MANAGE}="1"
