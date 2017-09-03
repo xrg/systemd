@@ -1,3 +1,6 @@
+%define git_repo systemd
+%define git_head HEAD
+
 %define libsystemd_major 0
 %define libudev_major 1
 
@@ -13,55 +16,32 @@
 
 Summary:	A System and Session Manager
 Name:		systemd
-Version:	230
+Version:	%git_get_ver
 %define     subrel 1
-Release:	%mkrel 12
+Release:	%mkrel %git_get_rel2
 License:	GPLv2+
 Group:		System/Boot and Init
 Url:		http://www.freedesktop.org/wiki/Software/systemd
 # (cg) Generate from git:
 # export VERSION=230; git archive --format=tar --prefix=systemd-${VERSION}/ v${VERSION} | xz > ../systemd-${VERSION}.tar.xz
-Source0:	%{name}-%{version}.tar.xz
+Source:		%git_bs_source %{name}-%{version}.tar.gz
+Source1:	%{name}-gitrpm.version
+Source2:	%{name}-changelog.gitrpm.txt
 
-Source10: 50-udev-mageia.rules
-Source11: 69-printeracl.rules
 # (hk) udev rules for zte 3g modems with drakx-net
-Source12: 61-mobile-zte-drakx-net.rules
 
 # (blino) net rules and helpers
-Source20: 81-net.rules
-Source21: udev_net_create_ifcfg
-Source22: udev_net_action
-Source23: udev_net.sysconfig
 
 # (cg) Upstream cherry picks
-Patch100: 0100-Revert-rules-allow-users-to-access-frame-buffer-devi.patch
-Patch101: 0101-automount-handle-expire_tokens-when-the-mount-unit-c.patch
-Patch102: 0102-rules-make-sure-always-set-at-least-one-property-on-.patch
-Patch103: 0103-If-the-notification-message-length-is-0-ignore-the-m.patch
-Patch104: 0104-pid1-don-t-return-any-error-in-manager_dispatch_noti.patch
-Patch105: 0105-pid1-process-zero-length-notification-messages-again.patch
-Patch106: 0106-pid1-more-informative-error-message-for-ignored-noti.patch
 # Upstream patch fixing build with gperf 3.1
-Patch107: 0107-add-check-for-gperf-lookup-function-signature.patch
 # fix mga#20753
-Patch108: 0108-tmpfiles-downgrade-error-message-when-operation-is-not-supported.patch
 
 # (cg/bor) clean up directories on boot as done by rc.sysinit
 # - Lennart should be poked about this (he couldn't think why he hadn't done it already)
-Patch500: 0500-Clean-directories-that-were-cleaned-up-by-rc.sysinit.patch
-Patch501: 0501-main-Add-failsafe-to-the-sysvinit-compat-cmdline-key.patch
-Patch502: 0502-mageia-Fallback-message-when-display-manager-fails.patch
-Patch503: 0503-Disable-modprobe-pci-devices-on-coldplug-for-storage.patch
 # (cg) Shouldn't be needed after 1aff20687f486857574fde0e5946a80b8ec212ba
 #Patch504: 0504-Allow-booting-from-live-cd-in-virtualbox.patch
 # (cg) We've carried this for a while now... maybe it can die now...
 #Patch505: 0505-reinstate-TIMEOUT-handling.patch
-Patch506: 0506-udev-Allow-the-udevadm-settle-timeout-to-be-set-via-.patch
-Patch507: 0507-Mageia-Relax-perms-on-sys-kernel-debug-for-lspcidrak.patch
-Patch508: 0508-udev-rules-Apply-SuSE-patch-to-restore-cdrom-cdrw-dv.patch
-Patch509: 0509-pam_systemd-Always-reset-XDG_RUNTIME_DIR.patch
-Patch510: 0510-pam-Suppress-errors-in-the-SuSE-patch-to-unset-XDG_R.patch
 # (cg) sysvinit integration (via chkconfig) support totally reworked and thus
 # these patches should no longer be required (sysvinit state should be kept in
 # sync now)
@@ -71,16 +51,11 @@ Patch510: 0510-pam-Suppress-errors-in-the-SuSE-patch-to-unset-XDG_R.patch
 # (cg) This was far warnings/issues in dracut but I think I committed a fix for
 # this now so this should be OK to leave in
 #Patch514: 0514-Revert-udev-hwdb-Support-shipping-pre-compiled-datab.patch
-Patch515: 0515-Add-path-to-locale-search.patch
 # (tmb) silcence udev version print as it breaks splash
-Patch516: 0516-udev-silence-version-print.patch
 
-Patch1000: systemd-230-CVE-2017-9217.patch
 # mga#21159
-Patch1001: systemd-230-CVE-2017-9445.patch
 
 # mga#21356
-Patch1002: systemd-230-mga21356-fix-segfault.patch
 
 BuildRequires:	dbus-devel >= 1.4.0
 BuildRequires:	libcap-devel
@@ -265,7 +240,8 @@ This package provides the development files for the udev shared library.
 
 
 %prep
-%autosetup -S git
+%git_get_source
+%setup -q
 find src/ -name "*.vala" -exec touch '{}' \;
 
 %build
@@ -291,17 +267,17 @@ find %{buildroot} \( -name '*.a' -o -name '*.la' \) -exec rm {} \;
 # (cg) Create and ship folder to hold user rules
 install -d -m 755 %{buildroot}%{_sysconfdir}/udev/rules.d
 
-install -m 644 %SOURCE10 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 644 %SOURCE11 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/50-udev-mageia.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 644 contrib/mageia/69-printeracl.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 # udev rules for zte 3g modems and drakx-net
-install -m 0644 %SOURCE12 %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0644 contrib/mageia/61-mobile-zte-drakx-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
 
 # net rules
-install -m 0644 %SOURCE20 %{buildroot}%{_prefix}/lib/udev/rules.d/
-install -m 0755 %SOURCE21 %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
-install -m 0755 %SOURCE22 %{buildroot}%{_prefix}/lib/udev/net_action
+install -m 0644 contrib/mageia/81-net.rules %{buildroot}%{_prefix}/lib/udev/rules.d/
+install -m 0755 contrib/mageia/udev_net_create_ifcfg %{buildroot}%{_prefix}/lib/udev/net_create_ifcfg
+install -m 0755 contrib/mageia/udev_net_action %{buildroot}%{_prefix}/lib/udev/net_action
 install -m 0755 -d %{buildroot}%{_sysconfdir}/sysconfig
-install -m 0644 %SOURCE23 %{buildroot}%{_sysconfdir}/sysconfig/udev_net
+install -m 0644 contrib/mageia/udev_net.sysconfig %{buildroot}%{_sysconfdir}/sysconfig/udev_net
 
 
 # Create SysV compatibility symlinks. systemctl/systemd are smart
