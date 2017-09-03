@@ -1,0 +1,7 @@
+# blacklist all automatic network actions for these interfaces
+BLACKLIST_ALL="ppp*|ippp*|isdn*|plip*|hso*|lo*|irda*|dummy*|ipsec*|vmnet*|wifi*|wmaster*|br*|vbd*|vtpm*|vif*|ax*|nr*|rose*|bce*|scc*|virbr*|vnet*|tmpbridge"
+# blacklist persistent naming actions for these interfaces
+# this includes persistent naming and ifcfg file creation
+# but ifup/ifdown actions are still allowed
+# *.* skips VLAN
+BLACKLIST_PERSISTENT="bnep*|pan*|tap*|tun*|usb*|*.*"
